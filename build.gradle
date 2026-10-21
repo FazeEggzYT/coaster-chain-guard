@@ -43,21 +43,98 @@ dependencies {
     compileOnly fileTree(dir: 'libs', include: ['*.jar'])
 }
 
-tasks.withType(ProcessResources).configureEach {
-    var replaceProperties = [
-        minecraft_version   : minecraft_version,
-        neo_version         : neo_version,
-        mod_id              : mod_id,
-        mod_name            : mod_name,
-        mod_version         : mod_version,
-        mod_license         : mod_license,
-        mod_authors         : mod_authors,
-        mod_description     : mod_description,
-        create_version_range: create_version_range,
-        coasters_version_range: coasters_version_range,
-    ]
-    inputs.properties replaceProperties
-    filesMatching(['META-INF/neoforge.mods.toml']) {
-        expand replaceProperties
+// ---------------------------------------------------------------------------
+// The two mod description files are written by the build itself, so the jar
+// always contains them regardless of how src/main/resources is laid out.
+// ---------------------------------------------------------------------------
+def modIdValue = mod_id
+def modNameValue = mod_name
+def modVersionValue = mod_version
+def modLicenseValue = mod_license
+def modAuthorsValue = mod_authors
+def modDescriptionValue = mod_description
+def minecraftVersionValue = minecraft_version
+def neoVersionValue = neo_version
+def createRangeValue = create_version_range
+def coastersRangeValue = coasters_version_range
+
+def generatedResources = layout.buildDirectory.dir('generated/modresources')
+
+tasks.register('generateModFiles') {
+    def outDir = generatedResources.get().asFile
+    outputs.dir(outDir)
+    inputs.property('modId', modIdValue)
+    inputs.property('modVersion', modVersionValue)
+    inputs.property('neoVersion', neoVersionValue)
+
+    doLast {
+        def metaInf = new File(outDir, 'META-INF')
+        metaInf.mkdirs()
+
+        new File(metaInf, 'neoforge.mods.toml').text = """\
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "${modLicenseValue}"
+
+[[mods]]
+modId = "${modIdValue}"
+version = "${modVersionValue}"
+displayName = "${modNameValue}"
+authors = "${modAuthorsValue}"
+description = '''${modDescriptionValue}'''
+
+[[mixins]]
+config = "${modIdValue}.mixins.json"
+
+[[dependencies.${modIdValue}]]
+modId = "neoforge"
+type = "required"
+versionRange = "[${neoVersionValue},)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.${modIdValue}]]
+modId = "minecraft"
+type = "required"
+versionRange = "[${minecraftVersionValue}]"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.${modIdValue}]]
+modId = "create"
+type = "required"
+versionRange = "${createRangeValue}"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.${modIdValue}]]
+modId = "simulatedcoasters"
+type = "required"
+versionRange = "${coastersRangeValue}"
+ordering = "AFTER"
+side = "BOTH"
+"""
+
+        new File(outDir, "${modIdValue}.mixins.json").text = """\
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.example.coasterchainguard.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "CartLinkTensionMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
+"""
     }
+}
+
+sourceSets.main.resources.srcDir(generatedResources)
+
+tasks.named('processResources') {
+    dependsOn 'generateModFiles'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
