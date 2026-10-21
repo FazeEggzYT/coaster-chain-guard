@@ -1,0 +1,12 @@
+   {
+     "required": true,
+     "minVersion": "0.8",
+     "package": "com.example.coasterchainguard.mixin",
+     "compatibilityLevel": "JAVA_21",
+     "mixins": [
+       "CartLinkTensionMixin"
+     ],
+     "injectors": {
+       "defaultRequire": 1
+     }
+   }
